@@ -14,6 +14,7 @@ DATA.mkdir(exist_ok=True); PROJECTS.mkdir(exist_ok=True)
 app = Flask(__name__)
 processes = {}
 logs = {}
+installing = set()
 
 def load():
     if not DB.exists(): return {}
@@ -76,6 +77,39 @@ def start(bot_id):
     threading.Thread(target=reader, args=(bot_id,proc), daemon=True).start()
     return True, "Started."
 
+
+def install_dependencies(bot_id):
+    if bot_id in installing:
+        return False, "Dependency installation is already running."
+    if bot_id not in bots:
+        return False, "Bot not found."
+    installing.add(bot_id)
+    def worker():
+        try:
+            f = folder(bot_id)
+            append_log(bot_id, "[VoidFlame] Installing dependencies...")
+            req = f / "requirements.txt"
+            package = f / "package.json"
+            if req.exists():
+                p = subprocess.Popen([sys.executable, "-m", "pip", "install", "-r", str(req)], cwd=str(f), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in p.stdout:
+                    append_log(bot_id, line)
+                append_log(bot_id, "[VoidFlame] pip finished with code " + str(p.wait()))
+            if package.exists() and shutil.which("npm"):
+                p = subprocess.Popen(["npm", "install"], cwd=str(f), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in p.stdout:
+                    append_log(bot_id, line)
+                append_log(bot_id, "[VoidFlame] npm finished with code " + str(p.wait()))
+            elif package.exists():
+                append_log(bot_id, "[VoidFlame] npm was not found; Node dependencies were skipped.")
+            append_log(bot_id, "[VoidFlame] Dependency setup finished.")
+        except Exception as exc:
+            append_log(bot_id, "[VoidFlame] Dependency setup failed: " + str(exc))
+        finally:
+            installing.discard(bot_id)
+    threading.Thread(target=worker, daemon=True).start()
+    return True, "Dependency installation started."
+
 def stop(bot_id):
     proc = processes.get(bot_id)
     if not proc or proc.poll() is not None: return False, "Bot is not running."
@@ -100,7 +134,7 @@ def index():
 @app.post("/bots")
 def add_bot():
     name=safe(request.form.get("name","bot")); url=request.form.get("github","").strip(); command=request.form.get("command","").strip()
-    try: owner,repo,zip_url=github_info(url); r=requests.get(zip_url,timeout=30); r.raise_for_status()
+    try: owner,repo=github_info(url); zip_url=f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/main"; r=requests.get(zip_url,timeout=60); r.raise_for_status()
     except Exception as e: return "GitHub download failed: "+str(e),400
     bid=safe(owner+"-"+repo+"-"+str(int(time.time()))); f=folder(bid); f.mkdir(parents=True)
     try:
@@ -109,7 +143,7 @@ def add_bot():
         roots=[x for x in (f/"_extract").iterdir() if x.is_dir()]; src=roots[0] if len(roots)==1 else f/"_extract"
         for x in src.iterdir(): shutil.move(str(x),str(f/x.name))
         shutil.rmtree(f/"_extract",ignore_errors=True); zpath.unlink(missing_ok=True)
-        bots[bid]={"name":name,"github":url,"command":command,"env":{}}; save(); return redirect("/")
+        bots[bid]={"name":name,"github":url,"command":command,"env":{}}; save(); install_dependencies(bid); return redirect("/")
     except Exception as e: shutil.rmtree(f,ignore_errors=True); return "Repository setup failed: "+str(e),500
 
 @app.post("/bots/<bid>/env")
@@ -129,6 +163,7 @@ def action(bid,op):
     if op=="start": ok,msg=start(bid)
     elif op=="stop": ok,msg=stop(bid)
     elif op=="restart": stop(bid); time.sleep(.4); ok,msg=start(bid)
+    elif op=="install": ok,msg=install_dependencies(bid)
     else:return jsonify(error="Unknown action"),400
     return jsonify(ok=ok,message=msg),(200 if ok else 400)
 
