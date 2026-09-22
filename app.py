@@ -3,7 +3,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
-from flask import Flask, jsonify, redirect, render_template_string, request
+from flask import Flask, jsonify, redirect, render_template, request
 
 APP_NAME = "VoidFlame Host"
 BASE = Path(__file__).resolve().parent
@@ -251,86 +251,6 @@ def install_repo(bot_id, source_dir):
         shutil.move(str(item), str(destination))
 
 
-HTML = r"""<!doctype html>
-<html lang="en" dir="ltr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{{ title }}</title>
-<style>
-:root{--bg:#07080c;--panel:#0e1118;--panel2:#121621;--line:#202634;--text:#f5f7fb;--muted:#8e98aa;--good:#59e391;--bad:#ff6678;--warn:#ffc857}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#1a1830 0,#07080c 42%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}.shell{max-width:1280px;margin:auto;padding:22px 18px 48px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#fff,#777);color:#090a0e;display:grid;place-items:center;font-weight:900}.brand h1{font-size:22px;margin:0}.muted{color:var(--muted)}.top-actions,.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#0c0f15;color:var(--text);padding:10px 14px;border-radius:11px}.btn.primary{background:#f5f7fb;color:#07080c;border-color:#f5f7fb;font-weight:700}.hero{margin-top:22px;padding:26px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.015));box-shadow:0 20px 60px rgba(0,0,0,.25)}.hero h2{font-size:32px;margin:0 0 8px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.stat{padding:16px;border:1px solid var(--line);background:var(--panel);border-radius:15px}.stat b{font-size:24px}.section{margin-top:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}.card{border:1px solid var(--line);background:rgba(14,17,24,.94);border-radius:18px;padding:18px;box-shadow:0 10px 35px rgba(0,0,0,.15)}.bot-head{display:flex;justify-content:space-between;gap:12px}.bot-name{font-size:19px;font-weight:800}.badge{font-size:12px;border-radius:999px;padding:6px 9px;background:#171b24;color:var(--muted)}.badge.online{color:var(--good)}.badge.crashed{color:var(--bad)}.badge.installing{color:var(--warn)}.repo{font-size:12px;color:var(--muted);word-break:break-all;margin:8px 0 14px}.field{margin-top:12px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}input,textarea{width:100%;border:1px solid var(--line);background:#090b10;color:var(--text);border-radius:11px;padding:11px;outline:none}textarea{resize:vertical}.console{background:#050609;border:1px solid #171b23;border-radius:12px;padding:12px;min-height:150px;max-height:240px;overflow:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}.empty{padding:35px;text-align:center;border:1px dashed var(--line);border-radius:18px}.toast{position:fixed;right:16px;bottom:16px;background:#f5f7fb;color:#07080c;padding:12px 15px;border-radius:12px;display:none;max-width:90vw}.danger{color:#ff8290}.hint{font-size:12px;color:var(--muted);margin-top:7px}@media(max-width:700px){.stats{grid-template-columns:1fr}.hero h2{font-size:25px}.shell{padding:16px 12px 35px}.grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<div class="shell">
-<header class="top">
-  <div class="brand"><div class="logo">VF</div><div><h1>VoidFlame Host</h1><div class="muted">Private bot hosting control center</div></div></div>
-  <div class="top-actions"><button class="btn" onclick="location.reload()">Refresh</button></div>
-</header>
-
-<section class="hero">
-  <h2>Your bots. Your device. Your control.</h2>
-  <div class="muted">Upload a complete project folder or deploy directly from GitHub. Dependencies, processes and console logs are managed locally.</div>
-  <div class="stats">
-    <div class="stat"><div class="muted">Bots</div><b>{{ total }}</b></div>
-    <div class="stat"><div class="muted">Running</div><b>{{ running }}</b></div>
-    <div class="stat"><div class="muted">Device host</div><b>LOCAL</b></div>
-  </div>
-</section>
-
-<section class="section card">
-  <h2 style="margin-top:0">Deploy a bot</h2>
-  <form method="post" action="/bots/upload" enctype="multipart/form-data" onsubmit="deploying(this)">
-    <div class="field"><label>Bot name</label><input name="name" placeholder="VoidFlame System" required></div>
-    <div class="field"><label>Project folder</label><input type="file" name="files" webkitdirectory directory multiple required></div>
-    <div class="hint">Choose the whole bot folder. All files and subfolders are uploaded together.</div>
-    <div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">Upload & Deploy Folder</button></div>
-  </form>
-  <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
-  <form method="post" action="/bots/github">
-    <div class="field"><label>GitHub repository</label><input name="name" placeholder="Bot name" required><input name="github" placeholder="https://github.com/owner/repository" required></div>
-    <div class="actions" style="margin-top:4px"><button class="btn" type="submit">Deploy from GitHub main</button></div>
-  </form>
-</section>
-
-<section class="section">
-{% if bot_list %}
-<div class="grid">
-{% for b in bot_list %}
-<article class="card">
-  <div class="bot-head"><div><div class="bot-name">{{ b.name }}</div><div class="repo">{{ b.source }}</div></div><span class="badge {{ b.state }}">{{ b.state|upper }}</span></div>
-  <div class="field"><label>Start command</label><input id="cmd-{{ b.id }}" value="{{ b.command }}" placeholder="python bot.py"></div>
-  <div class="actions" style="margin-top:10px">
-    {% if b.state == "online" %}<button class="btn" onclick="act('{{b.id}}','stop')">Stop</button>{% else %}<button class="btn primary" onclick="act('{{b.id}}','start')">Start</button>{% endif %}
-    <button class="btn" onclick="act('{{b.id}}','restart')">Restart</button>
-    <button class="btn" onclick="act('{{b.id}}','install')">Install deps</button>
-    <button class="btn" onclick="saveCommand('{{b.id}}')">Save command</button>
-    <button class="btn" onclick="deleteBot('{{b.id}}')">Delete</button>
-  </div>
-  <div class="field"><label>Environment Variables — JSON</label><textarea id="env-{{b.id}}" rows="5">{{ b.env }}</textarea></div>
-  <div class="actions"><button class="btn" onclick="saveEnv('{{b.id}}')">Save variables</button></div>
-  <div class="field"><label>Console</label><pre class="console" id="log-{{b.id}}">{{ b.log }}</pre></div>
-</article>
-</div>
-{% endfor %}
-{% else %}
-<div class="empty"><h2>No bots deployed</h2><div class="muted">Upload your complete bot folder above to get started.</div></div>
-{% endif %}
-</section>
-</div>
-<div id="toast" class="toast"></div>
-<script>
-function toast(message){const t=document.getElementById("toast");t.textContent=message;t.style.display="block";setTimeout(()=>t.style.display="none",2600)}
-async function act(id,op){const r=await fetch("/api/bots/"+id+"/"+op,{method:"POST"});const d=await r.json();toast(d.message||d.error);setTimeout(()=>location.reload(),500)}
-async function saveCommand(id){const command=document.getElementById("cmd-"+id).value;const body=new URLSearchParams({command});const r=await fetch("/api/bots/"+id+"/command",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});const d=await r.json();toast(d.message||d.error)}
-async function saveEnv(id){const env=document.getElementById("env-"+id).value;const body=new URLSearchParams({env});const r=await fetch("/api/bots/"+id+"/env",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});const d=await r.json();toast(d.message||d.error)}
-async function deleteBot(id){if(!confirm("Delete this bot and all uploaded files?"))return;const r=await fetch("/api/bots/"+id+"/delete",{method:"POST"});const d=await r.json();toast(d.message||d.error);setTimeout(()=>location.reload(),500)}
-function deploying(form){const b=form.querySelector("button");b.disabled=true;b.textContent="Uploading..."}
-</script>
-</body>
-</html>"""
-
 
 def page_data():
     items = []
@@ -355,7 +275,7 @@ def page_data():
 @app.get("/")
 def index():
     items, running = page_data()
-    return render_template_string(HTML, title=APP_NAME, bot_list=items, total=len(items), running=running)
+    return render_template("index.html", title=APP_NAME, bot_list=items, total=len(items), running=running)
 
 
 @app.post("/bots/upload")
